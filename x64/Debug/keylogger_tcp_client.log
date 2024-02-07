@@ -1,0 +1,6 @@
+﻿  main.c
+C:\Users\goodr\source\repos\keylogger_tcp_client\keylogger_tcp_client\main.c(317,10): warning C4101: 'recvbuf' :참조되지 않은 지역 변수입니다.
+C:\Users\goodr\source\repos\keylogger_tcp_client\keylogger_tcp_client\main.c(409,13): warning C4098: 'TcpSend': 'void' 함수에서 값을 반환하고 있습니다.
+C:\Users\goodr\source\repos\keylogger_tcp_client\keylogger_tcp_client\main.c(442,56): warning C4113: 'unsigned int (__cdecl *)()'은(는) '_beginthreadex_proc_type'과(와) 매개 변수 목록이 다릅니다.
+C:\Users\goodr\source\repos\keylogger_tcp_client\keylogger_tcp_client\main.c(422): warning C4716: 'Key': 값을 반환해야 합니다.
+  keylogger_tcp_client.vcxproj -> C:\Users\goodr\source\repos\keylogger_tcp_client\x64\Debug\keylogger_tcp_client.exe
