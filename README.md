@@ -21,8 +21,8 @@ Capture keyboard input, and then send it to a server and the server saves it to 
 ## IDE
 ### OS
 - server: Linux / client: Windows 11
-###program
+### program
 - server: vim / client: VISUAL STUDIO 2022
-###Language Package: C, C++
-###how to compile
+### Language Package: C, C++
+### how to compile
 - server: type './keylogger_tcp_server' / client: push Ctrl + F5
